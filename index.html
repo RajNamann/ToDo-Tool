@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Time Tracker</title>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- CSS -->
+    <style>
+:root {
+    --primary: #4a7fff;
+    --primary-hover: #2f63d6;
+    --danger: #e0524d;
+    --danger-hover: #c63d38;
+    --bg-light: #f5f6fa;
+    --bg-dark: #121212;
+    --card-light: #ffffff;
+    --card-dark: #1b1b1b;
+    --text-light: #222;
+    --text-dark: #e6e6e6;
+    --border-light: #d1d1d1;
+    --border-dark: #3c3c3c;
+    --radius: 8px;
+    --transition: 0.25s ease;
+}
+
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    padding: 40px 20px;
+    background: var(--bg-light);
+    color: var(--text-light);
+    transition: background var(--transition), color var(--transition);
+}
+
+.container { 
+    max-width: 1100px; 
+    margin: auto; 
+}
+
+input, button {
+    padding: 10px 12px;
+    margin: 6px 10px 14px 0;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-light);
+    font-size: 15px;
+    transition: var(--transition);
+}
+
+input:focus { 
+    border-color: var(--primary);
+    outline: none; 
+}
+
+button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+button:hover { background: var(--primary-hover); }
+
+button#themeToggle {
+    background: #555;
+}
+button#themeToggle:hover {
+    background: #333;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.input-row label {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+#task { flex: 1; min-width: 260px; }
+#hours { width: 70px; text-align: center; }
+
+.btn-blue, .btn-red {
+    white-space: nowrap;
+    border-radius: var(--radius);
+}
+
+.btn-blue {
+    background: var(--primary);
+    color: white;
+}
+.btn-blue:hover { background: var(--primary-hover); }
+
+.btn-red {
+    background: var(--danger);
+    color: white;
+}
+.btn-red:hover { background: var(--danger-hover); }
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 25px;
+    background: var(--card-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: var(--transition);
+}
+
+th {
+    background: #eef1f7;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+th, td { 
+    border: 1px solid var(--border-light); 
+    padding: 12px 14px;
+    text-align: left; 
+    font-size: 14px;
+}
+
+#logTable td:nth-child(4), #logTable th:nth-child(4) {
+    width: 140px;
+    text-align: center;
+}
+
+.action-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    margin-right: 4px;
+}
+
+#chartContainer { 
+    margin-top: 50px; 
+    background: var(--card-light); 
+    padding: 25px; 
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: var(--transition);
+}
+
+/* Dark Mode */
+body.dark { 
+    background: var(--bg-dark); 
+    color: var(--text-dark); 
+}
+
+body.dark input, body.dark button {
+    background: #222; 
+    color: var(--text-dark); 
+    border: 1px solid var(--border-dark);
+}
+
+body.dark table, 
+body.dark #chartContainer {
+    background: var(--card-dark);
+    border-color: var(--border-dark);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+body.dark th { background: #2b2b2b; color: #fff; }
+body.dark td, body.dark th { border-color: var(--border-dark); }
+</style>
+
+    
+</head>
+
+<body>
+<div class="container">
+
+<h2>Redmine Time Tracker</h2>
+
+<div class="input-row">
+    <div>
+        <label>User Name:</label>
+        <input type="text" id="username" placeholder="Your name" oninput="saveUserName()">
+    </div>
+
+    <button id="themeToggle" onclick="toggleTheme()">Dark Mode</button>
+</div>
+
+<div class="input-row">
+    <div>
+        <label>Date:</label>
+        <input type="date" id="date">
+    </div>
+
+    <div class="flex-grow">
+        <label>Task:</label>
+        <input type="text" id="task" placeholder="Enter work">
+    </div>
+
+    <div>
+        <label>Hours:</label>
+        <input type="number" id="hours" step="0.25" placeholder="0.00">
+    </div>
+
+    <button onclick="addEntry()" class="btn-blue">Add</button>
+    <button onclick="clearData()" class="btn-red">Clear All Data</button>
+</div>
+
+<h3>Daily Log</h3>
+
+<table id="logTable">
+    <tr>
+        <th>Date</th>
+        <th>Task</th>
+        <th>Hours</th>
+        <th>Action</th>
+    </tr>
+</table>
+
+<h3>Daily Total: <span id="dailyTotal">0</span> hours</h3>
+<h3>Monthly Total: <span id="monthlyTotal">0</span> hours</h3>
+
+<button onclick="downloadExcel()">Download Excel</button>
+<button onclick="downloadPDF()">Download PDF</button>
+
+<div id="chartContainer">
+    <h3>Daily Hours Trend</h3>
+    <canvas id="hoursChart" height="100"></canvas>
+</div>
+
+</div>
+
+<script>
+let entries = JSON.parse(localStorage.getItem("entries") || "[]");
+let chart;
+
+// Save & Load Username
+function saveUserName() { localStorage.setItem("username", document.getElementById("username").value); }
+function loadUserName() { document.getElementById("username").value = localStorage.getItem("username") || ""; }
+
+// Add Entry
+function addEntry() {
+    let date = document.getElementById("date").value;
+    let task = document.getElementById("task").value;
+    let hours = parseFloat(document.getElementById("hours").value);
+    if (!date || !task || !hours) return;
+
+    entries.push({ date, task, hours });
+    saveData();
+    updateTable();
+}
+
+// Save to LocalStorage
+function saveData() { localStorage.setItem("entries", JSON.stringify(entries)); }
+
+// Delete Entry
+function deleteEntry(index) {
+    if (!confirm("Delete this entry?")) return;
+    entries.splice(index, 1);
+    saveData();
+    updateTable();
+}
+
+// Edit Entry
+function editEntry(index) {
+    let updatedTask = prompt("Edit Task:", entries[index].task);
+    if (updatedTask === null) return;
+
+    let updatedHours = prompt("Edit Hours:", entries[index].hours);
+    if (updatedHours === null || isNaN(updatedHours)) return;
+
+    entries[index].task = updatedTask;
+    entries[index].hours = parseFloat(updatedHours);
+    saveData();
+    updateTable();
+}
+
+// Update Table + Totals + Chart
+function updateTable() {
+    let table = document.getElementById("logTable");
+    table.innerHTML = `
+        <tr>
+            <th>Date</th>
+            <th>Task</th>
+            <th>Hours</th>
+            <th>Action</th>
+        </tr>
+    `;
+
+    let dailyTotal = {};
+    let monthlyTotal = 0;
+
+    entries.forEach((e, index) => {
+        let row = table.insertRow(-1);
+        row.insertCell(0).innerHTML = e.date;
+        row.insertCell(1).innerHTML = e.task;
+        row.insertCell(2).innerHTML = e.hours;
+        row.insertCell(3).innerHTML = `
+    <button onclick="editEntry(${index})" class="action-btn" style="background:orange;color:white;border:none;">Edit</button>
+    <button onclick="deleteEntry(${index})" class="action-btn" style="background:#d9534f;color:white;border:none;">Delete</button>
+`;
+
+
+        if (!dailyTotal[e.date]) dailyTotal[e.date] = 0;
+        dailyTotal[e.date] += e.hours;
+        monthlyTotal += e.hours;
+    });
+
+    let latestDate = entries.length ? entries[entries.length - 1].date : "";
+    document.getElementById("dailyTotal").innerText = dailyTotal[latestDate] || 0;
+    document.getElementById("monthlyTotal").innerText = monthlyTotal.toFixed(2);
+
+    updateChart(dailyTotal);
+}
+
+function updateChart(dailyTotal) {
+    let labels = Object.keys(dailyTotal).sort();
+    let data = labels.map(d => dailyTotal[d]);
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("hoursChart"), {
+        type: "line",
+        data: { labels, datasets: [{ data, borderWidth: 2 }] },
+        options: { responsive: true }
+    });
+}
+
+function clearData() { if (confirm("Delete ALL data?")) { entries = []; saveData(); updateTable(); } }
+function downloadExcel() {
+    let wb = XLSX.utils.book_new();
+    let name = localStorage.getItem("username") || "User";
+    let ws = XLSX.utils.json_to_sheet(entries);
+    XLSX.utils.book_append_sheet(wb, ws, name + "_Time_Log");
+    XLSX.writeFile(wb, name + "_time_tracker.xlsx");
+}
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF();
+    let name = localStorage.getItem("username") || "User";
+    doc.setFontSize(14);
+    doc.text("Time Tracking Report", 14, 15);
+    doc.text("User: " + name, 14, 23);
+
+    let rows = entries.map(e => [e.date, e.task, e.hours]);
+    let total = entries.reduce((s, e) => s + e.hours, 0).toFixed(2);
+
+    doc.autoTable({ head: [["Date", "Task", "Hours"]], body: rows, startY: 30 });
+    doc.text("Total Hours: " + total, 14, doc.lastAutoTable.finalY + 10);
+    doc.save(name + "_time_tracker.pdf");
+}
+
+function toggleTheme() {
+    document.body.classList.toggle("dark");
+    localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+}
+
+loadUserName();
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark");
+updateTable();
+</script>
+
+</body>
+</html>
